@@ -18,6 +18,7 @@ void AssignCharacterRequest::SerializeRaw(TiltedPhoques::Buffer::Writer& aWriter
     Serialization::WriteBool(aWriter, IsDragon);
     Serialization::WriteBool(aWriter, IsMount);
     Serialization::WriteBool(aWriter, IsPlayerSummon);
+    Serialization::WriteBool(aWriter, IsEncounterCandidate);
     CurrentActorData.Serialize(aWriter);
     LeveledNpcPickId.Serialize(aWriter);
 }
@@ -52,6 +53,7 @@ void AssignCharacterRequest::DeserializeRaw(TiltedPhoques::Buffer::Reader& aRead
     IsDragon = Serialization::ReadBool(aReader);
     IsMount = Serialization::ReadBool(aReader);
     IsPlayerSummon = Serialization::ReadBool(aReader);
+    IsEncounterCandidate = Serialization::ReadBool(aReader);
 
     CurrentActorData.Deserialize(aReader);
     LeveledNpcPickId.Deserialize(aReader);

@@ -413,6 +413,31 @@ TEST_CASE("Packets", "[encoding.packets]")
         sendMessage.Position.z = 125452.4f;
         sendMessage.Rotation.x = -1.87f;
         sendMessage.Rotation.y = 45.35f;
+        sendMessage.IsEncounterCandidate = true;
+
+        Buffer::Writer writer(&buff);
+        sendMessage.Serialize(writer);
+
+        Buffer::Reader reader(&buff);
+
+        uint64_t trash;
+        reader.ReadBits(trash, 8); // pop opcode
+
+        recvMessage.DeserializeRaw(reader);
+
+        REQUIRE(sendMessage == recvMessage);
+    }
+
+    SECTION("AssignCharacterResponse")
+    {
+        Buffer buff(1000);
+
+        AssignCharacterResponse sendMessage, recvMessage;
+        sendMessage.Cookie = 14523698;
+        sendMessage.ServerId = 4521;
+        sendMessage.OwnershipEpoch = 7;
+        sendMessage.Owner = true;
+        sendMessage.Suppressed = true;
 
         Buffer::Writer writer(&buff);
         sendMessage.Serialize(writer);

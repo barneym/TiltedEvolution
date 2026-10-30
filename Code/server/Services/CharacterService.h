@@ -69,6 +69,7 @@ protected:
     void OnSubtitleRequest(const PacketEvent<SubtitleRequest>& acMessage) const noexcept;
 
     void CreateCharacter(const PacketEvent<AssignCharacterRequest>& acMessage) const noexcept;
+    bool ShouldSuppressEncounter(const PacketEvent<AssignCharacterRequest>& acMessage) const noexcept;
     void PopulateAssignmentResponse(entt::entity aEntity, AssignCharacterResponse& aResponse) const noexcept;
     static const char* GetOwnershipTransferReasonName(OwnershipTransferReason aReason) noexcept;
     bool CanClaimOwnership(Player* apPlayer, entt::entity aEntity, uint32_t aExpectedOwnershipEpoch, OwnershipTransferReason aReason) const noexcept;

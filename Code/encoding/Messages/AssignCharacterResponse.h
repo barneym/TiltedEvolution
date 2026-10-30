@@ -23,7 +23,8 @@ struct AssignCharacterResponse final : ServerMessage
     bool operator==(const AssignCharacterResponse& achRhs) const noexcept
     {
         return GetOpcode() == achRhs.GetOpcode() && Cookie == achRhs.Cookie && ServerId == achRhs.ServerId && PlayerId == achRhs.PlayerId && Position == achRhs.Position && CellId == achRhs.CellId && WorldSpaceId == achRhs.WorldSpaceId && AllActorValues == achRhs.AllActorValues &&
-               CurrentInventory == achRhs.CurrentInventory && ActionsToReplay == achRhs.ActionsToReplay && OwnershipEpoch == achRhs.OwnershipEpoch && Owner == achRhs.Owner && IsDead == achRhs.IsDead && IsWeaponDrawn == achRhs.IsWeaponDrawn && LeveledNpcPickId == achRhs.LeveledNpcPickId;
+               CurrentInventory == achRhs.CurrentInventory && ActionsToReplay == achRhs.ActionsToReplay && OwnershipEpoch == achRhs.OwnershipEpoch && Owner == achRhs.Owner && IsDead == achRhs.IsDead && IsWeaponDrawn == achRhs.IsWeaponDrawn && LeveledNpcPickId == achRhs.LeveledNpcPickId &&
+               Suppressed == achRhs.Suppressed;
     }
 
     uint32_t Cookie{};
@@ -40,4 +41,7 @@ struct AssignCharacterResponse final : ServerMessage
     bool Owner{false};
     bool IsDead{};
     bool IsWeaponDrawn{};
+    // The server refused to track this actor because another player is the encounter spawn authority.
+    // Only Cookie is meaningful; the client should remove its local copy.
+    bool Suppressed{};
 };

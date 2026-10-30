@@ -385,6 +385,26 @@ void CharacterService::OnAssignCharacter(const AssignCharacterResponse& acMessag
     m_world.remove<ReplayedActionsDebugComponent>(cEntity);
 #endif
 
+    if (acMessage.Suppressed)
+    {
+        // The party leader spawns encounters near them, so drop our own roll.
+        // The leader's actors arrive through the usual remote spawn path.
+        if (const auto* pFormIdComponent = m_world.try_get<FormIdComponent>(cEntity))
+        {
+            Actor* pActor = Cast<Actor>(TESForm::GetById(pFormIdComponent->Id));
+            if (pActor && pActor->IsTemporary())
+            {
+                spdlog::info("Removed encounter actor {:X}, the party leader spawns encounters here", pActor->formID);
+                pActor->Delete();
+            }
+        }
+
+        if (m_world.valid(cEntity))
+            m_world.destroy(cEntity);
+
+        return;
+    }
+
     if (isCancelled)
     {
         if (acMessage.Owner)
@@ -1454,6 +1474,9 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
     message.IsDragon = pActor->IsDragon();
     message.IsMount = pActor->IsMount();
     message.IsPlayerSummon = pActor->GetCommandingActor() && pActor->GetCommandingActor()->formID == 0x14;
+    // Temporary actors the game spawned on its own, such as world encounters and scripted ambushes.
+    // Summons and mounts belong to whoever made them, so they are never deferred to the party leader.
+    message.IsEncounterCandidate = isTemporary && !isPlayer && !pActor->GetCommandingActor() && !message.IsMount;
 
     if (const TESNPC* pPick = pActor->GetLeveledPick())
     {
