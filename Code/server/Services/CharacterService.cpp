@@ -44,6 +44,16 @@
 namespace
 {
 Console::Setting bEnableXpSync{"Gameplay:bEnableXpSync", "Syncs combat XP within the party", true};
+Console::Setting uEncounterSpawnAuthority{
+    "Gameplay:uEncounterSpawnAuthority",
+    "Who spawns world encounters for a party: 0 every player spawns their own, 1 only the party leader spawns them and members see the leader's",
+    1u};
+
+enum EncounterSpawnAuthority : uint32_t
+{
+    kEveryPlayer = 0,
+    kPartyLeader = 1,
+};
 }
 
 CharacterService::CharacterService(World& aWorld, entt::dispatcher& aDispatcher) noexcept
@@ -242,8 +252,53 @@ void CharacterService::OnAssignCharacterRequest(const PacketEvent<AssignCharacte
         }
     }
 
+    if (ShouldSuppressEncounter(acMessage))
+    {
+        spdlog::debug(
+            "Suppressed encounter actor {:x}:{:x} from player {:x}, the party leader spawns encounters here",
+            refId.ModId, refId.BaseId, acMessage.pPlayer->GetId());
+
+        AssignCharacterResponse response{};
+        response.Cookie = message.Cookie;
+        response.Suppressed = true;
+        acMessage.pPlayer->Send(response);
+        return;
+    }
+
     // This entity has no owner create it
     CreateCharacter(acMessage);
+}
+
+bool CharacterService::ShouldSuppressEncounter(const PacketEvent<AssignCharacterRequest>& acMessage) const noexcept
+{
+    const auto& message = acMessage.Packet;
+
+    if (uEncounterSpawnAuthority.value_as<uint32_t>() != kPartyLeader || !message.IsEncounterCandidate)
+        return false;
+
+    const auto& partyService = m_world.GetPartyService();
+    const auto& partyComponent = acMessage.pPlayer->GetParty();
+    if (!partyComponent.JoinedPartyId || partyService.IsPlayerLeader(acMessage.pPlayer))
+        return false;
+
+    const auto* pParty = partyService.GetById(*partyComponent.JoinedPartyId);
+    if (!pParty)
+        return false;
+
+    const Player* pLeader = m_world.GetPlayerManager().GetById(pParty->LeaderPlayerId);
+    if (!pLeader || !pLeader->GetCharacter())
+        return false;
+
+    // Only defer to the leader when the leader is close enough to own the encounter.
+    // Members exploring on their own keep spawning their own encounters.
+    CellIdComponent spawnCell{message.CellId};
+    if (message.WorldSpaceId != GameId{})
+    {
+        spawnCell.WorldSpaceId = message.WorldSpaceId;
+        spawnCell.CenterCoords = GridCellCoords::CalculateGridCellCoords(message.Position);
+    }
+
+    return pLeader->GetCellComponent().IsInRange(spawnCell, message.IsDragon);
 }
 
 void CharacterService::OnOwnershipTransferRequest(const PacketEvent<RequestOwnershipTransfer>& acMessage) const noexcept
