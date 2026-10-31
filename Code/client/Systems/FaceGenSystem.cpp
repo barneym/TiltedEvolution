@@ -64,9 +64,6 @@ void FaceGenSystem::Update(World& aWorld, Actor* apActor, FaceGenComponent& aFac
     POINTER_SKYRIMSE(TCreateTints, CreateTints, 27040);
     POINTER_SKYRIMSE(TextureHolder, s_textureHolder, 411393);
 
-    if (aFaceGenComponent.Generated)
-        return;
-
     auto pTriBasedGeom = GetHeadTriBasedGeom(apActor, 1);
 
     if (!pTriBasedGeom)
@@ -84,6 +81,13 @@ void FaceGenSystem::Update(World& aWorld, Actor* apActor, FaceGenComponent& aFac
     if (pLightingShader->GetRTTI() == NiMaskedShaderRTTI.Get())
     {
         BSMaskedShaderMaterial* pMaterial = static_cast<BSMaskedShaderMaterial*>(pLightingShader->material);
+
+        // Rebuilding the head, such as when a save is loaded, leaves it without the texture made for the old one
+        if (aFaceGenComponent.Texture && pMaterial->renderedTexture.object == aFaceGenComponent.Texture)
+        {
+            pShaderProperty->DecRef();
+            return;
+        }
 
         BSFixedString name("");
         auto pTexture = CreateTexture(name);
@@ -125,7 +129,9 @@ void FaceGenSystem::Update(World& aWorld, Actor* apActor, FaceGenComponent& aFac
 
         pMaterial->renderedTexture = pTexture;
 
-        aFaceGenComponent.Generated = true;
+        aFaceGenComponent.Texture = pTexture;
+
+        spdlog::info("Generated face tints for actor {:X}", apActor->formID);
     }
 
     pShaderProperty->DecRef();
