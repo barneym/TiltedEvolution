@@ -28,6 +28,7 @@ namespace
 {
 constexpr double kTickInterval = 0.5;       // seconds between follow updates
 constexpr double kTeleportCooldown = 5.0;   // seconds between teleport requests
+constexpr double kLogInterval = 5.0;        // seconds between distance lines in the log
 constexpr float kTeleportDistance = 3000.f; // game units (about 43 m) before snapping to the leader
 constexpr float kFollowBehind = -150.f;     // offset behind the leader, in the leader's local space
 constexpr float kCatchUpRadius = 400.f;     // run to catch up past this distance
@@ -110,6 +111,7 @@ void DebugService::ToggleFollowLeader() noexcept
     m_followTargetFormId = 0;
     m_followTickTimer = 0.0;
     m_followTeleportCooldown = 0.0;
+    m_followLogTimer = 0.0;
     Utils::ShowHudMessage("Follow mode on");
     spdlog::info("Follow mode on");
 }
@@ -135,6 +137,7 @@ void DebugService::UpdateFollowLeader(double aDelta) noexcept
         return;
 
     m_followTeleportCooldown = std::max(0.0, m_followTeleportCooldown - aDelta);
+    m_followLogTimer -= aDelta;
     m_followTickTimer -= aDelta;
     if (m_followTickTimer > 0.0)
         return;
@@ -159,6 +162,15 @@ void DebugService::UpdateFollowLeader(double aDelta) noexcept
     const bool sameWorldSpace = pLeader && pLeader->GetWorldSpace() && pLeader->GetWorldSpace() == pPlayer->GetWorldSpace();
     const bool nearby = pLeader && (sameCell || sameWorldSpace) && glm::distance(glm::vec3(pLeader->position), glm::vec3(pPlayer->position)) <= kTeleportDistance;
 
+    if (m_followLogTimer <= 0.0)
+    {
+        m_followLogTimer = kLogInterval;
+        if (pLeader)
+            spdlog::info("Follow mode: {:.0f} units from leader, same cell: {}", glm::distance(glm::vec3(pLeader->position), glm::vec3(pPlayer->position)), sameCell);
+        else
+            spdlog::info("Follow mode: leader not loaded here");
+    }
+
     if (!nearby)
     {
         // Leader is far away, in another cell, or not loaded here: snap to them, then follow on the next ticks.
@@ -173,6 +185,7 @@ void DebugService::UpdateFollowLeader(double aDelta) noexcept
         TeleportCommandRequest request{};
         request.TargetPlayer = it->second;
         m_transport.Send(request);
+        spdlog::info("Follow mode: teleporting to leader");
 
         m_followTeleportCooldown = kTeleportCooldown;
         m_followTargetFormId = 0; // Re-apply the follow after arriving.
