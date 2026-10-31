@@ -6,10 +6,13 @@
 
 #include <Structs/Tints.h>
 
+struct NiTexture;
+
 struct FaceGenComponent
 {
     FaceGenComponent() noexcept {}
 
-    bool Generated{false};
+    // Only compared, to notice when the head no longer shows this texture
+    const NiTexture* Texture{nullptr};
     Tints FaceTints{};
 };
