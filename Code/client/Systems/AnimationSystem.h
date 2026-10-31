@@ -27,6 +27,16 @@ struct AnimationSystem
      */
     static void Setup(World& aWorld, entt::entity aEntity) noexcept;
     /**
+     * @brief Whether animation sync should be logged in detail: ST_ANIM_LOG is set, and this isn't a master build.
+     */
+    static bool IsDiagnosticLogging() noexcept;
+    /**
+     * @brief Logs changes to an actor's furniture and weapon state, when diagnostic logging is on.
+     * @param apActor The actor to check.
+     * @param aIsLocal Whether this client owns the actor.
+     */
+    static void LogStateChanges(Actor* apActor, bool aIsLocal) noexcept;
+    /**
      * @brief Unregisters an actor from receiving remote animations.
      *
      * This function is not being used.
