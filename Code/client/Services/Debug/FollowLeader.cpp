@@ -33,6 +33,7 @@ constexpr float kTeleportDistance = 3000.f; // game units (about 43 m) before sn
 constexpr float kFollowBehind = -150.f;     // offset behind the leader, in the leader's local space
 constexpr float kCatchUpRadius = 400.f;     // run to catch up past this distance
 constexpr float kFollowRadius = 150.f;      // stop moving inside this distance
+constexpr float kTurnThreshold = 20.f;      // degrees off course before the follower is turned
 
 const void* GetNative(const char* acpScript, const char* acpFunction) noexcept
 {
@@ -54,14 +55,21 @@ bool SetPlayerAIDriven(bool aDriven) noexcept
     return true;
 }
 
-bool KeepOffsetFromActor(Actor* apActor, Actor* apTarget) noexcept
+// KeepOffsetFromActor holds the target's heading plus an offset, so turning toward the target needs the difference.
+float GetFacingOffset(const Actor* apActor, const Actor* apTarget) noexcept
+{
+    const float cBearing = std::atan2(apTarget->position.x - apActor->position.x, apTarget->position.y - apActor->position.y);
+    return glm::degrees(cBearing - apTarget->rotation.z);
+}
+
+bool KeepOffsetFromActor(Actor* apActor, Actor* apTarget, float aFacingOffset) noexcept
 {
     static const void* s_pAddress = GetNative("Actor", "KeepOffsetFromActor");
     if (!s_pAddress)
         return false;
 
     static PapyrusFunction<void, Actor, Actor*, float, float, float, float, float, float, float, float> s_keepOffset(s_pAddress);
-    s_keepOffset(apActor, apTarget, 0.f, kFollowBehind, 0.f, 0.f, 0.f, 0.f, kCatchUpRadius, kFollowRadius);
+    s_keepOffset(apActor, apTarget, 0.f, kFollowBehind, 0.f, 0.f, 0.f, aFacingOffset, kCatchUpRadius, kFollowRadius);
     return true;
 }
 
@@ -192,11 +200,20 @@ void DebugService::UpdateFollowLeader(double aDelta) noexcept
         return;
     }
 
+    const float cFacingOffset = GetFacingOffset(pPlayer, pLeader);
+
     if (m_followTargetFormId == pLeader->formID)
+    {
+        // Close to the leader the bearing swings wildly, and the follower has nowhere to go anyway.
+        const float cOffCourse = std::remainder(cFacingOffset - m_followFacingOffset, 360.f);
+        if (glm::distance(glm::vec3(pLeader->position), glm::vec3(pPlayer->position)) > kFollowRadius && std::abs(cOffCourse) > kTurnThreshold && KeepOffsetFromActor(pPlayer, pLeader, cFacingOffset))
+            m_followFacingOffset = cFacingOffset;
         return;
+    }
 
     // New or changed target: hand the player to the AI and point it at the leader.
-    if (!SetPlayerAIDriven(true) || !KeepOffsetFromActor(pPlayer, pLeader))
+    m_followFacingOffset = cFacingOffset;
+    if (!SetPlayerAIDriven(true) || !KeepOffsetFromActor(pPlayer, pLeader, cFacingOffset))
     {
         StopFollowingLeader();
         Utils::ShowHudMessage("Follow mode unavailable, see the client log");

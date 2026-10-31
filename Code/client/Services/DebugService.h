@@ -101,4 +101,5 @@ private:
     double m_followTickTimer = 0.0;
     double m_followTeleportCooldown = 0.0;
     double m_followLogTimer = 0.0;
+    float m_followFacingOffset = 0.f;
 };
