@@ -41,8 +41,20 @@ static void PreloadSystemDlls()
         loadSystemDll(dll);
 }
 
+// Code in the launcher image has no unwind data once the game is mapped over it, so under Wine 11
+// a thread naming exception raised there reaches the top of the thread and ends the process.
+static LONG WINAPI ThreadNameExceptionHandler(PEXCEPTION_POINTERS apExceptionInfo)
+{
+    if (apExceptionInfo->ExceptionRecord->ExceptionCode == 0x406D1388)
+        return EXCEPTION_CONTINUE_EXECUTION;
+
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 int main(int argc, char** argv)
 {
+    AddVectoredExceptionHandler(1, ThreadNameExceptionHandler);
+
     Base::SetCurrentThreadName("MainLauncherThread");
 
     // memory block for Script Extender reserved as early as we can
