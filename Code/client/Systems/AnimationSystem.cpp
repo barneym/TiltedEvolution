@@ -45,7 +45,7 @@ void AnimationSystem::LogStateChanges(Actor* apActor, bool aIsLocal) noexcept
     if (!cIsNew && itor->second == cState)
         return;
 
-    itor->second = cState;
+    itor.value() = cState;
 
     const auto* pLeft = apActor->GetEquippedWeapon(0);
     const auto* pRight = apActor->GetEquippedWeapon(1);
