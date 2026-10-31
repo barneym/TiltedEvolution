@@ -105,23 +105,35 @@ static TiltedPhoques::Initializer s_xinputSlotHooks(
         if (s_slot == 0)
             return; // Nothing to remap.
 
-        // Skyrim SE imports XInput by name from xinput1_3.dll.
-        const char* cModuleName = "xinput1_3.dll";
+        // Hook whichever XInput DLL the game imports instead of assuming one. These are the versions the launcher
+        // preloads (kSystemPreloadDlls in immersive_launcher/Main.cpp). The log line says which one matched.
+        constexpr const char* cModuleNames[] = {"xinput1_3.dll", "xinput1_4.dll", "xinput9_1_0.dll"};
+        auto& hooks = TiltedPhoques::FunctionHookManager::GetInstance();
 
-        TP_HOOK_IAT(XInputGetState, cModuleName);
-        TP_HOOK_IAT(XInputSetState, cModuleName);
-        TP_HOOK_IAT(XInputGetCapabilities, cModuleName);
-
-        if (!RealXInputGetState)
+        const char* pHookedModule = nullptr;
+        for (const char* pModuleName : cModuleNames)
         {
-            spdlog::warn("ST_XINPUT_SLOT is set but XInputGetState is not imported from {}; gamepad slot left unchanged", cModuleName);
+            RealXInputGetState = reinterpret_cast<TXInputGetState>(hooks.Add(reinterpret_cast<void*>(&HookXInputGetState), pModuleName, "XInputGetState"));
+            if (!RealXInputGetState)
+                continue;
+
+            RealXInputSetState = reinterpret_cast<TXInputSetState>(hooks.Add(reinterpret_cast<void*>(&HookXInputSetState), pModuleName, "XInputSetState"));
+            RealXInputGetCapabilities =
+                reinterpret_cast<TXInputGetCapabilities>(hooks.Add(reinterpret_cast<void*>(&HookXInputGetCapabilities), pModuleName, "XInputGetCapabilities"));
+            pHookedModule = pModuleName;
+            break;
+        }
+
+        if (!pHookedModule)
+        {
+            spdlog::warn("ST_XINPUT_SLOT is set but the game imports XInputGetState from no known XInput DLL; gamepad slot left unchanged");
             return;
         }
 
         if (s_slot == kNoPads)
-            spdlog::info("ST_XINPUT_SLOT: this client ignores all gamepads");
+            spdlog::info("ST_XINPUT_SLOT: this client ignores all gamepads (hooked {})", pHookedModule);
         else
-            spdlog::info("ST_XINPUT_SLOT: this client reads gamepad slot {}", s_slot);
+            spdlog::info("ST_XINPUT_SLOT: this client reads gamepad slot {} (hooked {})", s_slot, pHookedModule);
     });
 
 #endif
