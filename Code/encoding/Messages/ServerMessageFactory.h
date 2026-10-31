@@ -57,6 +57,7 @@
 #include <Messages/NotifyWeatherChange.h>
 #include <Messages/NotifySetWaypoint.h>
 #include <Messages/NotifyRemoveWaypoint.h>
+#include <Messages/NotifyPartyCheckpoint.h>
 #include <Messages/NotifySetTimeResult.h>
 #include <Messages/NotifyActionEvents.h>
 
@@ -73,7 +74,7 @@ struct ServerMessageFactory
             NotifyActorValueChanges, NotifyPartyJoined, NotifyPartyLeft, NotifyActorMaxValueChanges, NotifyHealthChangeBroadcast, NotifyActivate, NotifyLockChange, AssignObjectsResponse, NotifyDeathStateChange, NotifyOwnershipTransfer, NotifyObjectInventoryChanges, NotifySpellCast,
             NotifyProjectileLaunch, NotifyInterruptCast, NotifyAddTarget, NotifyScriptAnimation, NotifyDrawWeapon, NotifyMount, NotifyNewPackage, NotifyRespawn, NotifySyncExperience, NotifyEquipmentChanges, NotifyChatMessageBroadcast, TeleportCommandResponse, NotifyPlayerRespawn, NotifyDialogue,
             NotifySubtitle, NotifyPlayerDialogue, NotifyActorTeleport, NotifyPlayerLeft, NotifyPlayerJoined, NotifyDialogue, NotifySubtitle, NotifyPlayerDialogue, NotifyPlayerLevel, NotifyPlayerCellChanged, NotifyTeleport, NotifyPlayerHealthUpdate, NotifySettingsChange,
-            NotifyWeatherChange, NotifySetWaypoint, NotifyRemoveWaypoint, NotifySetTimeResult, NotifyRemoveSpell, NotifyActionEvents>;
+            NotifyWeatherChange, NotifySetWaypoint, NotifyRemoveWaypoint, NotifySetTimeResult, NotifyRemoveSpell, NotifyActionEvents, NotifyPartyCheckpoint>;
 
         return s_visitor(std::forward<T>(func));
     }

@@ -504,6 +504,25 @@ TEST_CASE("Packets", "[encoding.packets]")
         REQUIRE(sendMessage == recvMessage);
     }
 
+    GIVEN("NotifyPartyCheckpoint")
+    {
+        NotifyPartyCheckpoint sendMessage, recvMessage;
+        sendMessage.CheckpointId = 1234567;
+
+        Buffer buff(1000);
+        Buffer::Writer writer(&buff);
+        sendMessage.Serialize(writer);
+
+        Buffer::Reader reader(&buff);
+
+        uint64_t trash;
+        reader.ReadBits(trash, 8); // pop opcode
+
+        recvMessage.DeserializeRaw(reader);
+
+        REQUIRE(sendMessage == recvMessage);
+    }
+
     GIVEN("NotifyActionEvents")
     {
         ActionEvent action;

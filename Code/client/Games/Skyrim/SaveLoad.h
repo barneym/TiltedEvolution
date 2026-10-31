@@ -6,22 +6,18 @@ struct BGSSaveLoadManager
 {
     virtual ~BGSSaveLoadManager();
 
-    struct SaveData
-    {
-        void* unk0;           // maybe vtable
-        uint32_t someCounter; // 0x8
-        uint32_t unkC;
-        void* unk10;        // 0x10
-        void* someFunction; // 0x18
+    static BGSSaveLoadManager* Get() noexcept;
 
-        uint32_t unk58; // 0x58
+    // Whether the game would allow a save at this moment
+    bool CanSave() noexcept;
 
-        uint32_t flags; // 0x340
+    // Asks for a save in the given slot, replacing any queued one. It runs once the player is free to save.
+    static void QueueSave(uint32_t aSlot) noexcept;
+    static void CancelQueuedSave() noexcept;
 
-        char* saveName; // 0xBB0
-    };
-
-    void Save(SaveData* apData);
+    // Saving makes the game wait for the script VM, so this must run on the main thread. Running it
+    // from the VM's update, where UpdateEvent comes from, would freeze the game.
+    static void ProcessQueuedSave() noexcept;
 
     struct Struct330
     {
@@ -32,8 +28,6 @@ struct BGSSaveLoadManager
     uint8_t pad8[0x330 - 0x8];
     Struct330* struct330; // 330
 };
-
-static_assert(offsetof(BGSSaveLoadManager::SaveData, someFunction) == 0x18);
 
 struct BGSSaveFormBuffer
 {
