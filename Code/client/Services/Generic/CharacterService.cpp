@@ -705,9 +705,19 @@ void CharacterService::OnNotifyActionEvents(const NotifyActionEvents& acMessage)
         auto itor = std::find_if(std::begin(view), std::end(view), [serverId = serverId, view](entt::entity entity) { return view.get<RemoteComponent>(entity).Id == serverId; });
 
         if (itor == std::end(view))
+        {
+            if (AnimationSystem::IsDiagnosticLogging())
+                spdlog::info("AnimDiag lost: {} actions for server id {:X}, no remote actor", actions.size(), serverId);
             continue;
+        }
 
         auto& animationComponent = view.get<RemoteAnimationComponent>(*itor);
+
+        if (AnimationSystem::IsDiagnosticLogging())
+        {
+            for (const auto& action : actions)
+                spdlog::info("AnimDiag recv server id {:X}: '{}' sit {}, {} waiting", serverId, action.EventName.c_str(), action.State1 >> 14 & 0xF, animationComponent.TimePoints.size());
+        }
 
         // Played once the actor's playback clock reaches their tick, in step with its movement
         for (const auto& action : actions)
@@ -1872,6 +1882,8 @@ void CharacterService::RunLocalUpdates() const noexcept
         if (!pActor)
             continue;
 
+        AnimationSystem::LogStateChanges(pActor, true);
+
         // Remote clients play actions on the same timeline as movement, by the time playback reaches an action it waits
         // for the snapshot after it anyway, so sending actions along with that snapshot doesn't delay them
         AnimationSystem::SerializeActions(actionsMessage, localComponent, animationComponent);
@@ -1931,6 +1943,8 @@ void CharacterService::RunRemoteUpdates() noexcept
         auto* pActor = Cast<Actor>(pForm);
         if (!pActor)
             continue;
+
+        AnimationSystem::LogStateChanges(pActor, false);
 
         // Actions run on the clock the interpolation pass above just advanced, so the body and its animations stay in step
         const auto cTick = InterpolationSystem::GetPlaybackTick(animatedView.get<InterpolationComponent>(entity));

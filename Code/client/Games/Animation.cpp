@@ -12,6 +12,8 @@
 
 #include <Misc/BSFixedString.h>
 
+#include <Systems/AnimationSystem.h>
+
 #include <World.h>
 
 TP_THIS_FUNCTION(TPerformAction, uint8_t, ActorMediator, TESActionData* apAction);
@@ -44,7 +46,13 @@ uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apActi
 
         // This is a weird case where it gets spammed and doesn't do much, not sure if it still needs to be sent over the network
         if (apAction->someFlag == 1 || g_forceAnimation)
+        {
+            // The dropped actions are spammed, so only the ones during a furniture transition are logged
+            if (!g_forceAnimation && (action.State1 >> 14 & 0xF) != 0 && AnimationSystem::IsDiagnosticLogging())
+                spdlog::info("AnimDiag dropped {:X}: '{}' action {:X} result {}, sit {}", action.ActorId, apAction->eventName.AsAscii(), action.ActionId, res, action.State1 >> 14 & 0xF);
+
             return res;
+        }
 
         action.EventName = apAction->eventName.AsAscii();
         action.TargetEventName = apAction->targetEventName.AsAscii();
@@ -55,6 +63,9 @@ uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apActi
         {
             pExtension->LatestAnimation = action;
         }
+
+        if (AnimationSystem::IsDiagnosticLogging())
+            spdlog::info("AnimDiag sent {:X}: '{}' action {:X} idle {:X} result {}, sit {}", action.ActorId, action.EventName.c_str(), action.ActionId, action.IdleId, res, action.State1 >> 14 & 0xF);
 
         World::Get().GetRunner().Trigger(action);
 

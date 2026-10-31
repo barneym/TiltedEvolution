@@ -23,6 +23,7 @@
 #include <Games/TES.h>
 #include <Games/Overrides.h>
 #include <EquipManager.h>
+#include <Systems/AnimationSystem.h>
 #include <Games/ActorExtension.h>
 #include <Forms/TESNPC.h>
 #include <DefaultObjectManager.h>
@@ -219,6 +220,9 @@ void InventoryService::OnNotifyEquipmentChanges(const NotifyEquipmentChanges& ac
 
     uint32_t itemId = modSystem.GetGameId(acMessage.ItemId);
     TESForm* pItem = TESForm::GetById(itemId);
+
+    if (AnimationSystem::IsDiagnosticLogging())
+        spdlog::info("AnimDiag equipment {:X}: item {:X}, found {}, unequip {}", pActor->formID, itemId, pItem != nullptr, acMessage.Unequip);
 
     if (!pItem)
     {
