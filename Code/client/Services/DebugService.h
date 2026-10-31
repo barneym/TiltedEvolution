@@ -65,6 +65,12 @@ private:
     void DrawCalendarView();
     void DrawDragonSpawnerView();
 
+    // Solo testing: make the local player follow the party leader (FollowLeader.cpp)
+    void ToggleFollowLeader() noexcept;
+    void UpdateFollowLeader(double aDelta) noexcept;
+    void StopFollowingLeader() noexcept;
+    void DrawFollowLeaderControls() noexcept;
+
 public:
     bool m_showDebugStuff = false;
 
@@ -89,4 +95,9 @@ private:
     entt::scoped_connection m_dialogueConnection;
     bool m_showBuildTag = true;
     bool m_drawComponentsInWorldSpace = false;
+
+    bool m_followLeader = false;
+    uint32_t m_followTargetFormId = 0;
+    double m_followTickTimer = 0.0;
+    double m_followTeleportCooldown = 0.0;
 };

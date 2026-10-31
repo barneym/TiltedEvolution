@@ -30,6 +30,7 @@
 #include <PlayerCharacter.h>
 
 #include <Games/TES.h>
+#include <BSGraphics/BSGraphicsRenderer.h>
 
 MagicService::MagicService(World& aWorld, entt::dispatcher& aDispatcher, TransportService& aTransport) noexcept
     : m_world(aWorld)
@@ -630,6 +631,15 @@ void MagicService::ApplyQueuedEffects() noexcept
     }
 }
 
+namespace
+{
+bool IsGameWindowForeground() noexcept
+{
+    auto* pWindow = BSGraphics::GetMainWindow();
+    return pWindow && pWindow->IsForeground();
+}
+} // namespace
+
 void MagicService::StartRevealingOtherPlayers() noexcept
 {
     UpdateRevealOtherPlayersEffect(/*forceTrigger=*/true);
@@ -645,7 +655,10 @@ void MagicService::UpdateRevealOtherPlayersEffect(bool aForceTrigger) noexcept
     static std::chrono::steady_clock::time_point revealStartTimePoint;
     static std::chrono::steady_clock::time_point lastSendTimePoint;
 
-    const bool shouldActivate = aForceTrigger || GetAsyncKeyState(VK_F4) & 0x01;
+    // Read the key every frame so the "pressed since last call" bit can't go stale, but only act on it when this
+    // window has focus. Otherwise, with two clients side by side, one F4 press reveals in both.
+    const bool keyPressed = (GetAsyncKeyState(VK_F4) & 0x01) != 0;
+    const bool shouldActivate = aForceTrigger || (keyPressed && IsGameWindowForeground());
 
     if (shouldActivate && !m_revealingOtherPlayers)
     {
