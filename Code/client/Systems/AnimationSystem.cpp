@@ -41,11 +41,11 @@ void AnimationSystem::LogStateChanges(Actor* apActor, bool aIsLocal) noexcept
     const uint32_t cIsWeaponDrawn = apActor->actorState.IsWeaponDrawn() ? 1 : 0;
     const uint32_t cState = cSitSleepState | cIsWeaponDrawn << 4 | (aIsLocal ? 1 : 0) << 5;
 
-    auto [itor, cIsNew] = s_lastStates.try_emplace(apActor->formID, cState);
-    if (!cIsNew && itor->second == cState)
+    const auto itor = s_lastStates.find(apActor->formID);
+    if (itor != std::end(s_lastStates) && itor->second == cState)
         return;
 
-    itor->second = cState;
+    s_lastStates[apActor->formID] = cState;
 
     const auto* pLeft = apActor->GetEquippedWeapon(0);
     const auto* pRight = apActor->GetEquippedWeapon(1);
