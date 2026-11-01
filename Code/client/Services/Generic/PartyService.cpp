@@ -153,7 +153,7 @@ void PartyService::OnPartyInvite(const NotifyPartyInvite& acPartyInvite) noexcep
 
 void PartyService::OnPartyJoined(const NotifyPartyJoined& acPartyJoined) noexcept
 {
-    spdlog::debug("[PartyService]: Joined party. LeaderId: {}, IsLeader: {}", acPartyJoined.LeaderPlayerId, acPartyJoined.IsLeader);
+    spdlog::info("[PartyService]: Joined party. LeaderId: {}, IsLeader: {}", acPartyJoined.LeaderPlayerId, acPartyJoined.IsLeader);
 
     m_inParty = true;
     m_isLeader = acPartyJoined.IsLeader;
