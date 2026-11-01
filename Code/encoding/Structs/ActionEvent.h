@@ -8,6 +8,9 @@ using TiltedPhoques::String;
 
 struct ActionEvent
 {
+    // Set in Type when the action succeeded on the client that owns the actor.
+    static constexpr uint32_t kOwnerSucceeded = 0x8;
+
     uint64_t Tick{0};
     uint32_t ActorId{0};
     uint32_t ActionId{0};

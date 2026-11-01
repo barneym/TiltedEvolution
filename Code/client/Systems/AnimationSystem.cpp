@@ -89,6 +89,7 @@ void AnimationSystem::Update(World& aWorld, Actor* apActor, RemoteAnimationCompo
 
         apActor->LoadAnimationVariables(first.Variables);
 
+        const String cPreviousEvent = aAnimationComponent.LastRanAction.EventName;
         aAnimationComponent.LastRanAction = first;
 
         // Play the animation
@@ -99,10 +100,31 @@ void AnimationSystem::Update(World& aWorld, Actor* apActor, RemoteAnimationCompo
 
         const auto result = ActorMediator::Get()->ForceAction(&actionData);
 
-        constexpr uint32_t kReportedFailedStreak = 50;
-        aAnimationComponent.FailedActionStreak = result ? 0 : aAnimationComponent.FailedActionStreak + 1;
-        if (IsDiagnosticLogging() && aAnimationComponent.FailedActionStreak == kReportedFailedStreak)
-            spdlog::info("AnimDiag streak {:X}: {} actions failed in a row, last '{}'", apActor->formID, kReportedFailedStreak, first.EventName.c_str());
+        // A copy's result is its graph accepting the event (0x1407c51e0). An event the owner's graph accepted and this one
+        // refused means the two graphs are in different states. Blank events never succeed anywhere, so they don't count.
+        if (IsDiagnosticLogging() && !first.EventName.empty() && (first.Type & ActionEvent::kOwnerSucceeded))
+        {
+            aAnimationComponent.RefusedStreak = result ? 0 : aAnimationComponent.RefusedStreak + 1;
+            if (!result)
+            {
+                static BSFixedString s_equipOk("bEquipOk");
+                static BSFixedString s_animationDriven("bAnimationDriven");
+                static BSFixedString s_inMoveState("bInMoveState");
+                static BSFixedString s_iState("iState");
+                bool equipOk = false;
+                bool animationDriven = false;
+                bool inMoveState = false;
+                uint32_t iState = 0;
+                apActor->animationGraphHolder.GetVariableBool(&s_equipOk, &equipOk);
+                apActor->animationGraphHolder.GetVariableBool(&s_animationDriven, &animationDriven);
+                apActor->animationGraphHolder.GetVariableBool(&s_inMoveState, &inMoveState);
+                apActor->animationGraphHolder.GetVariableInt(&s_iState, &iState);
+
+                spdlog::info("AnimDiag refused {:X}: '{}' idle {:X}, streak {}, replay {}, previous '{}', sit {}, weapon {}, bEquipOk {}, bAnimationDriven {}, bInMoveState {}, iState {}",
+                    apActor->formID, first.EventName.c_str(), first.IdleId, aAnimationComponent.RefusedStreak, aAnimationComponent.ReplayCount > 0, cPreviousEvent.c_str(),
+                    apActor->actorState.flags1 >> 14 & 0xF, apActor->actorState.flags2 >> 5 & 7, equipOk, animationDriven, inMoveState, iState);
+            }
+        }
 
         if (IsDiagnosticLogging())
             spdlog::info("AnimDiag run {:X}: '{}' action {:X} idle {:X} result {}, sit {}, {} ticks late, {} left", apActor->formID, first.EventName.c_str(), actionId, first.IdleId, result, first.State1 >> 14 & 0xF, static_cast<int64_t>(aTick) - static_cast<int64_t>(first.Tick), actions.size() - 1);
