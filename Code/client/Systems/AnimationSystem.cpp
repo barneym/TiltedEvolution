@@ -99,6 +99,11 @@ void AnimationSystem::Update(World& aWorld, Actor* apActor, RemoteAnimationCompo
 
         const auto result = ActorMediator::Get()->ForceAction(&actionData);
 
+        constexpr uint32_t kReportedFailedStreak = 50;
+        aAnimationComponent.FailedActionStreak = result ? 0 : aAnimationComponent.FailedActionStreak + 1;
+        if (IsDiagnosticLogging() && aAnimationComponent.FailedActionStreak == kReportedFailedStreak)
+            spdlog::info("AnimDiag streak {:X}: {} actions failed in a row, last '{}'", apActor->formID, kReportedFailedStreak, first.EventName.c_str());
+
         if (IsDiagnosticLogging())
             spdlog::info("AnimDiag run {:X}: '{}' action {:X} idle {:X} result {}, sit {}, {} ticks late, {} left", apActor->formID, first.EventName.c_str(), actionId, first.IdleId, result, first.State1 >> 14 & 0xF, static_cast<int64_t>(aTick) - static_cast<int64_t>(first.Tick), actions.size() - 1);
 

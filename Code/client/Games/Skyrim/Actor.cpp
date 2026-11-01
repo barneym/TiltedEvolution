@@ -310,6 +310,12 @@ void Actor::SetWeaponDrawnEx(bool aDraw) noexcept
     g_forceAnimation = true;
     SetWeaponDrawn(aDraw);
     g_forceAnimation = false;
+
+    // The engine records a refused sheathe as state 4 and retries every frame. On a copy those retries can't pass
+    // HookPerformAction, so it would stay stuck, and an owner inheriting it would retry forever.
+    constexpr uint32_t kWantToSheathe = 4;
+    if (!aDraw && GetExtension()->IsRemote() && (actorState.flags2 >> 5 & 7) == kWantToSheathe)
+        actorState.SetWeaponDrawn(false);
 }
 
 static thread_local bool s_execInitPackage = false;

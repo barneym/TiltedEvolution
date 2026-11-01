@@ -208,6 +208,8 @@ void InventoryService::OnNotifyEquipmentChanges(const NotifyEquipmentChanges& ac
     });
     if (it == view.end())
     {
+        if (AnimationSystem::IsDiagnosticLogging())
+            spdlog::info("AnimDiag discarded equipment for server id {:X}, epoch {}", acMessage.ServerId, acMessage.OwnershipEpoch);
         spdlog::debug("Discarded an equipment update for actor {:X} because epoch {} is no longer current", acMessage.ServerId, acMessage.OwnershipEpoch);
         return;
     }
