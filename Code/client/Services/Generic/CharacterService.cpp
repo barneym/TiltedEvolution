@@ -231,6 +231,8 @@ void CharacterService::OnActorAdded(const ActorAddedEvent& acEvent) noexcept
 {
     Actor* pActor = Cast<Actor>(TESForm::GetById(acEvent.FormId));
 
+    m_departedActors.erase(acEvent.FormId);
+
     if (acEvent.FormId == 0x14)
     {
         pActor->GetExtension()->SetPlayer(true);
@@ -269,6 +271,7 @@ void CharacterService::OnActorRemoved(const ActorRemovedEvent& acEvent) noexcept
         pActor->GetExtension()->Reconciliation = ActorExtension::ReconciliationStage::None;
 
     m_pendingLeveledConforms.erase(acEvent.FormId);
+    m_conformInventories.erase(acEvent.FormId);
 
     auto view = m_world.view<FormIdComponent>();
     const auto entityIt = std::find_if(view.begin(), view.end(), [view, formId = acEvent.FormId](auto aEntity) { return view.get<FormIdComponent>(aEntity).Id == formId; });
@@ -331,6 +334,13 @@ void CharacterService::OnConnected(const ConnectedEvent& acConnectedEvent) const
 
 void CharacterService::OnDisconnected(const DisconnectedEvent& acDisconnectedEvent) const noexcept
 {
+    for (const uint32_t cFormId : m_departedActors)
+    {
+        if (auto* pActor = Cast<Actor>(TESForm::GetById(cFormId)))
+            pActor->GetExtension()->SetRemote(false);
+    }
+    m_departedActors.clear();
+
     auto remoteView = m_world.view<FormIdComponent, RemoteComponent>();
     for (auto entity : remoteView)
     {
@@ -1287,6 +1297,11 @@ void CharacterService::OnNotifyActorTeleport(const NotifyActorTeleport& acMessag
 
     MoveActor(pActor, acMessage.WorldSpaceId, acMessage.CellId, acMessage.Position);
 
+    // Moving it ended this client's copy, and left alone its local AI would run on this client's version of the world and
+    // could walk it straight back. Keep it passive until discovery finds it near the player here.
+    pActor->GetExtension()->SetRemote(true);
+    m_departedActors.insert(cActorId);
+
     spdlog::info("Successfully teleported actor, form id: {:X}, world space: {:X}, cell: {:X}, position: ({}, {}, {})", pActor->formID, acMessage.WorldSpaceId.BaseId, acMessage.CellId.BaseId, acMessage.Position.x, acMessage.Position.y, acMessage.Position.z);
 }
 
@@ -1736,6 +1751,10 @@ void CharacterService::ApplyLeveledNpcPick(Actor* apActor, const GameId& acPickI
     // Queueing to the runner from a drained task would re-lock its drain mutex.
     // Preserve the stage when a newer pick arrives during a disable or rebuild.
     m_pendingLeveledConforms[apActor->formID] = cPickId;
+
+    // The rebuild discards what the actor is carrying.
+    if (apActor->GetExtension()->IsRemote() && !m_conformInventories.contains(apActor->formID))
+        m_conformInventories[apActor->formID] = apActor->GetActorInventory();
 }
 
 void CharacterService::ProcessLeveledConforms() noexcept
@@ -1787,6 +1806,13 @@ void CharacterService::ProcessLeveledConforms() noexcept
 
             if (pActor->baseForm && pActor->baseForm->IsTemporary() && pActor->GetLeveledPick() == pPick)
             {
+                if (const auto inventoryIt = m_conformInventories.find(pActor->formID); inventoryIt != m_conformInventories.end())
+                {
+                    if (pActor->GetExtension()->IsRemote())
+                        pActor->SetActorInventory(inventoryIt->second);
+                    m_conformInventories.erase(inventoryIt);
+                }
+
                 spdlog::info("Completed leveled NPC reconciliation for actor {:X}, base: {:X}, pick: {:X}", it->first, pActor->baseForm->formID, cPickFormId);
                 stage = ReconciliationStage::None;
                 it = m_pendingLeveledConforms.erase(it);

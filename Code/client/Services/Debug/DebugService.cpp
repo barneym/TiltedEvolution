@@ -155,6 +155,7 @@ void DebugService::OnUpdate(const UpdateEvent& acUpdateEvent) noexcept
 #if (!IS_MASTER)
     // Runs before the focus check: the follower is usually the window you're not looking at.
     UpdateFollowLeader(acUpdateEvent.Delta);
+    UpdateRigCommands(acUpdateEvent.Delta);
 #endif
 
     if (!BSGraphics::GetMainWindow()->IsForeground())
