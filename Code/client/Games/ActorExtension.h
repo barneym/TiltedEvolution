@@ -33,6 +33,9 @@ struct ActorExtension
     // Protects discovery while rebuilding a leveled NPC.
     ReconciliationStage Reconciliation{ReconciliationStage::None};
 
+    // The owner has already told other clients about the sheathe that keeps failing.
+    bool SentFailedSheathe = false;
+
 private:
     uint32_t onlineFlags{0};
 };
