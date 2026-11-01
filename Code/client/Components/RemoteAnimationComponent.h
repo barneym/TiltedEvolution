@@ -11,4 +11,6 @@ struct RemoteAnimationComponent
     ActionEvent LastProcessedAction;
     uint32_t ReplayCount;
     bool ResetAnimationGraphForReplay{false};
+    uint32_t DiagnosticFrames{0};
+    uint32_t RefusedStreak{0};
 };

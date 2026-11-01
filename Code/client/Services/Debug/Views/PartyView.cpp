@@ -130,6 +130,9 @@ void DebugService::DrawPartyView()
     }
 
     ImGui::NewLine();
+#if (!IS_MASTER)
+    DrawFollowLeaderControls();
+#endif
     if (partyService.IsInParty())
     {
         if (ImGui::Button("Leave"))

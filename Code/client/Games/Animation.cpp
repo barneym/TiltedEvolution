@@ -12,6 +12,8 @@
 
 #include <Misc/BSFixedString.h>
 
+#include <Systems/AnimationSystem.h>
+
 #include <World.h>
 
 TP_THIS_FUNCTION(TPerformAction, uint8_t, ActorMediator, TESActionData* apAction);
@@ -19,6 +21,40 @@ static TPerformAction* RealPerformAction;
 
 // TODO: make scoped override
 thread_local bool g_forceAnimation = false;
+
+constexpr uint64_t kFailedActionRepeatTicks = 1000;
+
+// An actor stuck on a failing action retries it every frame, sometimes alternating two of them. Each try would queue an
+// action on every other client, which plays them one per frame and falls further behind for good.
+static bool IsRepeatedFailure(ActorExtension& aExtension, uint64_t aKey, uint64_t aTick, bool aSucceeded) noexcept
+{
+    auto* pOldest = &aExtension.FailedActions[0];
+    for (auto& failed : aExtension.FailedActions)
+    {
+        if (failed.Key == aKey)
+        {
+            if (aSucceeded)
+            {
+                failed = {};
+                return false;
+            }
+
+            if (aTick - failed.Tick < kFailedActionRepeatTicks)
+                return true;
+
+            failed.Tick = aTick;
+            return false;
+        }
+
+        if (failed.Tick < pOldest->Tick)
+            pOldest = &failed;
+    }
+
+    if (!aSucceeded)
+        *pOldest = {aKey, aTick};
+
+    return false;
+}
 
 uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apAction)
 {
@@ -44,17 +80,33 @@ uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apActi
 
         // This is a weird case where it gets spammed and doesn't do much, not sure if it still needs to be sent over the network
         if (apAction->someFlag == 1 || g_forceAnimation)
+        {
+            // The dropped actions are spammed, so only the ones during a furniture transition are logged
+            if (!g_forceAnimation && (action.State1 >> 14 & 0xF) != 0 && AnimationSystem::IsDiagnosticLogging())
+                spdlog::info("AnimDiag dropped {:X}: '{}' action {:X} result {}, sit {}", action.ActorId, apAction->eventName.AsAscii(), action.ActionId, res, action.State1 >> 14 & 0xF);
+
             return res;
+        }
 
         action.EventName = apAction->eventName.AsAscii();
         action.TargetEventName = apAction->targetEventName.AsAscii();
         action.IdleId = apAction->idleForm ? apAction->idleForm->formID : 0;
+
+        if (IsRepeatedFailure(*pExtension, static_cast<uint64_t>(action.ActionId) << 32 | action.IdleId, action.Tick, res != 0))
+            return res;
+
+        // For the diagnostic logging on other clients. Replay reads only the bits below this one.
+        if (res)
+            action.Type |= ActionEvent::kOwnerSucceeded;
 
         // Save for later
         if (res)
         {
             pExtension->LatestAnimation = action;
         }
+
+        if (AnimationSystem::IsDiagnosticLogging())
+            spdlog::info("AnimDiag sent {:X}: '{}' action {:X} idle {:X} result {}, sit {}", action.ActorId, action.EventName.c_str(), action.ActionId, action.IdleId, res, action.State1 >> 14 & 0xF);
 
         World::Get().GetRunner().Trigger(action);
 

@@ -125,6 +125,12 @@ void TiltedOnlineApp::Update()
 
     *bAlwaysActive = 1;
 
+    // The game otherwise skips actors the camera can't see, and other clients replay what the owner of an actor sends:
+    // an NPC would stop animating for everyone whenever its owner looked away.
+    POINTER_SKYRIMSE(uint32_t, bPreCullActors, 380927);
+
+    *bPreCullActors = 0;
+
     World::Get().Update();
 }
 

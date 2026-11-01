@@ -33,6 +33,14 @@ struct ActorExtension
     // Protects discovery while rebuilding a leveled NPC.
     ReconciliationStage Reconciliation{ReconciliationStage::None};
 
+    // The two actions this actor most recently failed, for dropping retries in HookPerformAction.
+    struct FailedAction
+    {
+        uint64_t Key{0};
+        uint64_t Tick{0};
+    };
+    FailedAction FailedActions[2]{};
+
 private:
     uint32_t onlineFlags{0};
 };
