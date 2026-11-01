@@ -2,12 +2,12 @@
 
 #include <Services/DebugService.h>
 
+#include <Games/ActorExtension.h>
+
 #include <AI/AIProcess.h>
 #include <Forms/TESNPC.h>
 #include <Forms/TESObjectCELL.h>
 #include <Forms/TESPackage.h>
-
-#include <PlayerCharacter.h>
 
 #include <cstdlib>
 #include <filesystem>
