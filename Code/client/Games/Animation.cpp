@@ -22,7 +22,39 @@ static TPerformAction* RealPerformAction;
 // TODO: make scoped override
 thread_local bool g_forceAnimation = false;
 
-constexpr uint32_t kSheatheAction = 0x46BAF;
+constexpr uint64_t kFailedActionRepeatTicks = 1000;
+
+// An actor stuck on a failing action retries it every frame, sometimes alternating two of them. Each try would queue an
+// action on every other client, which plays them one per frame and falls further behind for good.
+static bool IsRepeatedFailure(ActorExtension& aExtension, uint64_t aKey, uint64_t aTick, bool aSucceeded) noexcept
+{
+    auto* pOldest = &aExtension.FailedActions[0];
+    for (auto& failed : aExtension.FailedActions)
+    {
+        if (failed.Key == aKey)
+        {
+            if (aSucceeded)
+            {
+                failed = {};
+                return false;
+            }
+
+            if (aTick - failed.Tick < kFailedActionRepeatTicks)
+                return true;
+
+            failed.Tick = aTick;
+            return false;
+        }
+
+        if (failed.Tick < pOldest->Tick)
+            pOldest = &failed;
+    }
+
+    if (!aSucceeded)
+        *pOldest = {aKey, aTick};
+
+    return false;
+}
 
 uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apAction)
 {
@@ -56,19 +88,12 @@ uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apActi
             return res;
         }
 
-        // An actor that can't sheathe retries a few times a frame for as long as it stays stuck. Each try would queue
-        // an action on every other client, which plays them one per frame and falls further behind for good.
-        if (action.ActionId == kSheatheAction)
-        {
-            if (!res && pExtension->SentFailedSheathe)
-                return res;
-
-            pExtension->SentFailedSheathe = !res;
-        }
-
         action.EventName = apAction->eventName.AsAscii();
         action.TargetEventName = apAction->targetEventName.AsAscii();
         action.IdleId = apAction->idleForm ? apAction->idleForm->formID : 0;
+
+        if (IsRepeatedFailure(*pExtension, static_cast<uint64_t>(action.ActionId) << 32 | action.IdleId, action.Tick, res != 0))
+            return res;
 
         // Save for later
         if (res)

@@ -30,9 +30,9 @@ constexpr double kTickInterval = 0.5;       // seconds between follow updates
 constexpr double kTeleportCooldown = 5.0;   // seconds between teleport requests
 constexpr double kLogInterval = 5.0;        // seconds between distance lines in the log
 constexpr float kTeleportDistance = 3000.f; // game units (about 43 m) before snapping to the leader
-constexpr float kFollowBehind = -150.f;     // offset behind the leader, in the leader's local space
-constexpr float kCatchUpRadius = 400.f;     // run to catch up past this distance
-constexpr float kFollowRadius = 150.f;      // stop moving inside this distance
+constexpr float kFollowBehind = -300.f;     // offset behind the leader, in the leader's local space
+constexpr float kCatchUpRadius = 500.f;     // run to catch up past this distance
+constexpr float kFollowRadius = 100.f;      // stop moving inside this distance
 
 const void* GetNative(const char* acpScript, const char* acpFunction) noexcept
 {

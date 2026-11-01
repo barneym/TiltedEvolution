@@ -71,6 +71,9 @@ private:
     void StopFollowingLeader() noexcept;
     void DrawFollowLeaderControls() noexcept;
 
+    // Commands from the test rig, see RigCommands.cpp
+    void UpdateRigCommands(double aDelta) noexcept;
+
 public:
     bool m_showDebugStuff = false;
 

@@ -135,6 +135,8 @@ private:
     // Actor form ID -> pick form ID. The active stage lives in ActorExtension.
     // Written from const message handlers, drained by ProcessLeveledConforms.
     mutable Map<uint32_t, uint32_t> m_pendingLeveledConforms{};
+    mutable Map<uint32_t, Inventory> m_conformInventories{};
+    mutable Set<uint32_t> m_departedActors{};
 
     entt::scoped_connection m_referenceAddedConnection;
     entt::scoped_connection m_referenceRemovedConnection;
