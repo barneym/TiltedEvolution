@@ -101,6 +101,7 @@ private:
 
     bool m_followLeader = false;
     uint32_t m_followTargetFormId = 0;
+    bool m_followMoving = false;
     double m_followTickTimer = 0.0;
     double m_followTeleportCooldown = 0.0;
     double m_followLogTimer = 0.0;

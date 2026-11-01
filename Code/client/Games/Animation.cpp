@@ -95,6 +95,10 @@ uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apActi
         if (IsRepeatedFailure(*pExtension, static_cast<uint64_t>(action.ActionId) << 32 | action.IdleId, action.Tick, res != 0))
             return res;
 
+        // For the diagnostic logging on other clients. Replay reads only the bits below this one.
+        if (res)
+            action.Type |= ActionEvent::kOwnerSucceeded;
+
         // Save for later
         if (res)
         {

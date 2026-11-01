@@ -8,10 +8,14 @@
 #include <Forms/TESNPC.h>
 #include <Forms/TESObjectCELL.h>
 #include <Forms/TESPackage.h>
+#include <Interface/UI.h>
+#include <Systems/AnimationSystem.h>
 
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <unordered_map>
 
 // Lets the test rig drive a running client: ~/bin/rig-cmd drops commands in logs/rig-cmd.in and reads logs/rig-cmd.out.
 // Off unless ST_RIG_CMD is set. Commands: "con <console command>", "inspect <hex form id>".
@@ -100,12 +104,38 @@ void InspectActor(uint32_t aFormId, std::ofstream& aOutput) noexcept
     }
     aOutput << "\n";
 }
+// Menus close for reasons the game doesn't report, so leave a trail of when each one opened and closed.
+void LogMenuChanges() noexcept
+{
+    static std::unordered_map<std::string, bool> s_openMenus;
+
+    UI* pUI = UI::Get();
+    if (!pUI)
+        return;
+
+    for (const auto& it : pUI->menuMap)
+    {
+        const char* cpName = it.key.AsAscii();
+        if (!cpName)
+            continue;
+
+        const bool cOpen = pUI->GetMenuOpen(it.key);
+        auto& wasOpen = s_openMenus[cpName];
+        if (cOpen != wasOpen)
+            spdlog::info("AnimDiag menu '{}' {}", cpName, cOpen ? "opened" : "closed");
+        wasOpen = cOpen;
+    }
+}
+
 } // namespace
 
 void DebugService::UpdateRigCommands(double aDelta) noexcept
 {
     static const bool s_enabled = std::getenv("ST_RIG_CMD") != nullptr;
     static double s_elapsed = 0.0;
+
+    if (AnimationSystem::IsDiagnosticLogging())
+        LogMenuChanges();
 
     if (!s_enabled)
         return;

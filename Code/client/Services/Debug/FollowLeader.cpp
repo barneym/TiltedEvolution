@@ -17,8 +17,11 @@
 //
 // Toggle it with F8 in the follower's window, or with the checkbox in the debug Party window. While it is on, the
 // local player is handed to the game AI (Game.SetPlayerAIDriven) and told to stay close to the party leader's
-// character (Actor.KeepOffsetFromActor). If the leader is out of range or in another cell, the follower teleports to
-// them through the normal teleport-to-player request. Toggling it off gives control back.
+// character. The distance is an approach limit, not a position: the follower walks up to it from wherever it is, then
+// stands and turns to keep the leader in view, and only steps back if the leader walks right into it. KeepOffsetFromActor
+// holds a point fixed to the leader's facing, so that point is worked out again from where the follower is on every move.
+// If the leader is out of range or in another cell, the follower teleports to them through the normal teleport-to-player
+// request. Toggling it off gives control back.
 //
 // Non-master builds only, so it never ships in a release.
 
@@ -26,13 +29,16 @@
 
 namespace
 {
-constexpr double kTickInterval = 0.5;       // seconds between follow updates
+constexpr double kTickInterval = 0.25;      // seconds between follow updates
 constexpr double kTeleportCooldown = 5.0;   // seconds between teleport requests
 constexpr double kLogInterval = 5.0;        // seconds between distance lines in the log
 constexpr float kTeleportDistance = 3000.f; // game units (about 43 m) before snapping to the leader
-constexpr float kFollowBehind = -300.f;     // offset behind the leader, in the leader's local space
-constexpr float kCatchUpRadius = 500.f;     // run to catch up past this distance
-constexpr float kFollowRadius = 100.f;      // stop moving inside this distance
+constexpr float kApproachLimit = 300.f;     // the follower doesn't walk closer to the leader than this
+constexpr float kResumeDistance = 450.f;    // it stays put until the leader is further away than this
+constexpr float kGiveWayDistance = 120.f;   // it steps back when the leader comes this close
+constexpr float kArrivedMargin = 60.f;      // close enough to the approach limit to stop
+constexpr float kCatchUpRadius = 800.f;     // run to catch up past this distance
+constexpr float kFollowRadius = 50.f;       // how close to its target point the AI tries to get
 
 const void* GetNative(const char* acpScript, const char* acpFunction) noexcept
 {
@@ -54,15 +60,25 @@ bool SetPlayerAIDriven(bool aDriven) noexcept
     return true;
 }
 
-bool KeepOffsetFromActor(Actor* apActor, Actor* apTarget) noexcept
+// Sends the follower to the point at the approach limit on the line from the leader to where the follower is now.
+void WalkToApproachLimit(Actor* apActor, Actor* apLeader) noexcept
 {
     static const void* s_pAddress = GetNative("Actor", "KeepOffsetFromActor");
     if (!s_pAddress)
-        return false;
+        return;
+
+    const glm::vec2 cAway = glm::vec2(apActor->position.x, apActor->position.y) - glm::vec2(apLeader->position.x, apLeader->position.y);
+    const float cLength = glm::length(cAway);
+    const glm::vec2 cTarget = cLength > 1.f ? cAway / cLength * kApproachLimit : glm::vec2(0.f, -kApproachLimit);
+
+    // The offset is in the leader's local space, x to its right and y ahead of it.
+    const float cSin = std::sin(apLeader->rotation.z);
+    const float cCos = std::cos(apLeader->rotation.z);
+    const float cRight = cTarget.x * cCos - cTarget.y * cSin;
+    const float cAhead = cTarget.x * cSin + cTarget.y * cCos;
 
     static PapyrusFunction<void, Actor, Actor*, float, float, float, float, float, float, float, float> s_keepOffset(s_pAddress);
-    s_keepOffset(apActor, apTarget, 0.f, kFollowBehind, 0.f, 0.f, 0.f, 0.f, kCatchUpRadius, kFollowRadius);
-    return true;
+    s_keepOffset(apActor, apLeader, cRight, cAhead, 0.f, 0.f, 0.f, 0.f, kCatchUpRadius, kFollowRadius);
 }
 
 void ClearKeepOffsetFromActor(Actor* apActor) noexcept
@@ -109,6 +125,7 @@ void DebugService::ToggleFollowLeader() noexcept
 
     m_followLeader = true;
     m_followTargetFormId = 0;
+    m_followMoving = false;
     m_followTickTimer = 0.0;
     m_followTeleportCooldown = 0.0;
     m_followLogTimer = 0.0;
@@ -135,6 +152,13 @@ void DebugService::UpdateFollowLeader(double aDelta) noexcept
 {
     if (!m_followLeader)
         return;
+
+    // Every frame, since the AI turns the follower too. Its heading isn't otherwise tied to the leader's.
+    if (auto* pPlayer = PlayerCharacter::Get(); pPlayer && m_followTargetFormId)
+    {
+        if (const auto* pTarget = Cast<Actor>(TESForm::GetById(m_followTargetFormId)))
+            pPlayer->SetRotation(pPlayer->rotation.x, pPlayer->rotation.y, std::atan2(pTarget->position.x - pPlayer->position.x, pTarget->position.y - pPlayer->position.y));
+    }
 
     m_followTeleportCooldown = std::max(0.0, m_followTeleportCooldown - aDelta);
     m_followLogTimer -= aDelta;
@@ -192,19 +216,32 @@ void DebugService::UpdateFollowLeader(double aDelta) noexcept
         return;
     }
 
-    if (m_followTargetFormId == pLeader->formID)
-        return;
-
-    // New or changed target: hand the player to the AI and point it at the leader.
-    if (!SetPlayerAIDriven(true) || !KeepOffsetFromActor(pPlayer, pLeader))
+    if (m_followTargetFormId != pLeader->formID)
     {
-        StopFollowingLeader();
-        Utils::ShowHudMessage("Follow mode unavailable, see the client log");
-        return;
+        // New or changed target: hand the player to the AI.
+        if (!SetPlayerAIDriven(true))
+        {
+            StopFollowingLeader();
+            Utils::ShowHudMessage("Follow mode unavailable, see the client log");
+            return;
+        }
+
+        m_followTargetFormId = pLeader->formID;
+        m_followMoving = false;
+        spdlog::info("Follow mode: following leader {:X}", pLeader->formID);
     }
 
-    m_followTargetFormId = pLeader->formID;
-    spdlog::info("Follow mode: following leader {:X}", pLeader->formID);
+    const float cDistance = glm::distance(glm::vec3(pLeader->position), glm::vec3(pPlayer->position));
+    if (cDistance > kResumeDistance || cDistance < kGiveWayDistance)
+        m_followMoving = true;
+    else if (m_followMoving && std::abs(cDistance - kApproachLimit) < kArrivedMargin)
+    {
+        m_followMoving = false;
+        ClearKeepOffsetFromActor(pPlayer);
+    }
+
+    if (m_followMoving)
+        WalkToApproachLimit(pPlayer, pLeader);
 }
 
 void DebugService::DrawFollowLeaderControls() noexcept
